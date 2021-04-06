@@ -1,0 +1,13 @@
+glob2>=0.6
+numpy>=1.8.2
+pillow>=2.1.0
+scikit-image
+matplotlib>=2.0.2<3.0.0
+scipy
+pandas
+scikit-learn
+tensorflow-gpu
+keras
+opencv-python
+pylab
+tqdm
