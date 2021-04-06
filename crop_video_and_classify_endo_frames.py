@@ -93,6 +93,15 @@ def open_videoclip_moviepy(infile):
     n_frames = int(clip.duration/(1./clip_fps))
 
     return clip, [clip_fps, clip_duration, n_frames]
+
+def get_args():
+    import argparse
+    parser = argparse.ArgumentParser(description="parser for data cleaning", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--ckpt", type=str, default="./saved/CNN_network_128x128_positive_samples", help="please include ckpt in the ckpt directory!")
+    parser.add_argument("--videoInputFile", type=str, default="../video_cleaning/M_28082019110119_0000000000004312_1_001_001-1.MP4", help="provide folder for testType1 dataset under that name")
+    parser.add_argument("--videoOutputFolder", type=str, default="./cleanedVideos/", help="cleaned video directory")
+    args = parser.parse_args()
+    return args
     
 if __name__=="__main__":
     
@@ -103,23 +112,18 @@ if __name__=="__main__":
     from skimage.transform import resize
     from tqdm import tqdm
     import gc
+  
+    debug = 0
     
-    
+    args = get_args()
+    os.makedirs(args.videoOutputFolder, exist_ok=True)
 #==============================================================================
 #   Load the pretrained CNN model (2-class binary classification)  
 #==============================================================================
-    #CNN_model_file = '../BN_CNN_network_64x64_scratch_informative_75split_less_stringent'
-    #CNN_model_file = '../classify_densenet_190_0.7752382506926855_64_lr_updated.pth'
-    CNN_model_file = './saved/CNN_network_128x128_positive_samples'
+    CNN_model_file = args.ckpt
     CNN_classify_model = load_model(CNN_model_file)
-    
-    target_shape = (128,128)
-    #target_shape = (192,108)
-    #target_shape2 = (1079,1079)
-    
-
-    # give a test clip to try. 
-    testvideofile = '../video_cleaning/M_28082019110119_0000000000004312_1_001_001-1.MP4'
+    target_shape = (128,128) 
+    testvideofile = args.videoInputFile 
     clip, (clip_fps, clip_duration, n_frames) = open_videoclip_moviepy(testvideofile)
 
 #==============================================================================
@@ -129,32 +133,30 @@ if __name__=="__main__":
     mask, mask_bbox = getVidRegion(frame0, bw_thresh=10) # get the crop % replace with Sharib's c code ??
     clipped = frame0[mask_bbox[2]:mask_bbox[3], mask_bbox[0]:mask_bbox[1]]
     
-    
-    plt.figure()
-    plt.imshow(mask, cmap='gray')
-    plt.show()
-    
-    plt.figure()
-    plt.imshow(draw_bounding_box(frame0, mask_bbox, thickness=10))
-    plt.show()
+    if debug:
+        plt.figure()
+        plt.imshow(mask, cmap='gray')
+        plt.show()
+
+        plt.figure()
+        plt.imshow(draw_bounding_box(frame0, mask_bbox, thickness=10))
+        plt.show()
     
     
 ##==============================================================================
 ##   Crop and classify information in endoscopy videos on the fly  
 ##==============================================================================
-
+# TODO: include processing time
     sample_rate = 1
     batch_size = 1
     import cv2 as cv
+    fileName = args.videoInputFile.split('/')[-1]
     fourcc = cv.VideoWriter_fourcc(*'MPEG')
-    out_pos2 = cv.VideoWriter('output_pos28_128.avi', fourcc, clip_fps, (1920, 1080))
+    
+    out_pos2 = cv.VideoWriter(os.path.join(args.videoOutputFile, fileName), fourcc, clip_fps, (1920, 1080))
     
     infoness = ['uninformative', 'informative']
-
     frame_scores = []
-
-#    from scipy.misc import imsave
-
     n_batches = int(np.ceil(n_frames/float(batch_size)))
 
 
@@ -163,19 +165,18 @@ if __name__=="__main__":
         if i <n_batches:
             start = i*batch_size
             end = (i+1)*batch_size
-            #vid_frames2 = np.array([resize(crop_video( clip.get_frame(ii*1./clip_fps), mask_bbox ), target_shape2) for ii in range(start,end,1)]) 
             vid_frames = np.array([resize(crop_video( clip.get_frame(ii*1./clip_fps), mask_bbox ), target_shape) for ii in range(start,end,1)]) 
-            #vid_frames = np.array([resize(clip.get_frame(ii*1./clip_fps), target_shape) for ii in range(start,end,1)]) 
             vid_frames2 = np.array([( clip.get_frame(ii*1./clip_fps) ) for ii in range(start,end,1)])
             
-            # plt.figure()
-            # plt.imshow(vid_frames[i,:,:,:], cmap='gray')
-            # plt.show()
-            
-            # plt.figure()
-            # plt.imshow(vid_frames2[i,:,:,:], cmap='gray')
-            # plt.show()
-    
+            if debug:
+                plt.figure()
+                plt.imshow(vid_frames[i,:,:,:], cmap='gray')
+                plt.show()
+
+                plt.figure()
+                plt.imshow(vid_frames2[i,:,:,:], cmap='gray')
+                plt.show()
+
         else:
             start = i*batch_size
             vid_frames = np.array([resize(crop_video( clip.get_frame(ii*1./clip_fps), mask_bbox ), target_shape) for ii in range(start,n_frames,1)])       
@@ -187,40 +188,20 @@ if __name__=="__main__":
         
         for j in range(vid_frames.shape[0]):
             if information_index[j] == 1:
-        # writing to a image array
-                #img_array = (vid_frames2[j,:,:,:] * 255).astype(np.uint8)
                 img_array3 = (vid_frames2[j,:,:,:]).astype(np.uint8)
                 img_array4 = cv.cvtColor(img_array3, cv.COLOR_RGB2BGR)
                 out_pos2.write(img_array4)
                 
-        
-        #aa=vid_frames[0,:,:,:]
-        #out.write(vid_frames[0,:,:,:])
-        #out.write(aa)
-        
     frame_scores = np.hstack(frame_scores)
-    
     
     fig, ax = plt.subplots()
     ax.imshow(frame_scores[None,:], cmap='coolwarm')
     ax.set_aspect('auto')
+    # save it in file
+    plt.save(os.path.join(args.videoOutputFile, fileName.split('.')[0]+'.svg'))
     plt.show()
     out_pos2.release()
     
-# import cv2 as cv
-# cap = cv.VideoCapture(0)
-# # Define the codec and create VideoWriter object
-# fourcc = cv.VideoWriter_fourcc(*'MJPG')
-#fourcc = cv.VideoWriter_fourcc(*'FMP4')
-#fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-#out = cv2.VideoWriter('output.avi',fourcc, 20.0, (640,480))
-# out = cv.VideoWriter('output.MP4', fourcc, 50.0, (64,  64))
-# out.write(frame_scores)
-
-        
-print("Done!!")
-# plt.figure()
-# plt.imshow(vid_frames2[90,:,:,:])
-# plt.show()
-
-# img_array = (vid_frames[0,:,:,:] * 255).astype(np.uint8)
+print(" ===================================================\n")     
+print("Processing for {} is completed in __ s and saved to {}".format(args.videoInputFile, args.videoOutputFile))
+print(" ===================================================\n")  
