@@ -125,6 +125,7 @@ if __name__=="__main__":
     target_shape = (128,128) 
     testvideofile = args.videoInputFile 
     clip, (clip_fps, clip_duration, n_frames) = open_videoclip_moviepy(testvideofile)
+    print('-----> FPS rate is {}'.format(clip_fps))
 
 #==============================================================================
 #     Use a sample frame to crop the video.
