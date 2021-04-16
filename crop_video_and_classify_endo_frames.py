@@ -152,8 +152,8 @@ if __name__=="__main__":
     batch_size = 1
     import cv2 as cv
     fileName = args.videoInputFile.split('/')[-1]
-    fourcc = cv.VideoWriter_fourcc(*'MPEG')
-    
+    #fourcc = cv.VideoWriter_fourcc(*'MPEG')
+    fourcc =  cv.VideoWriter_fourcc('m','p', '4', 'v')
     out_pos2 = cv.VideoWriter(os.path.join(args.videoOutputFile, fileName), fourcc, clip_fps, (1920, 1080))
     
     infoness = ['uninformative', 'informative']
